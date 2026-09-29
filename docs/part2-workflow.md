@@ -48,6 +48,7 @@ flowchart TD
     G --> U
     A --> DB
     P --> DB
+    OS --> DB
     O --> DB
     U --> DB
 ```
@@ -83,7 +84,7 @@ gitGraph
 2. Makes changes, commits with clear messages
 3. Opens a Pull Request on GitHub
 4. PR is reviewed and merged into `main`
-5. Merge to `main` triggers the CI pipeline automatically
+5. The CI pipeline is started manually from the GitHub **Actions** tab once `main` is ready to ship
 
 Everything is tracked — who changed what, when, and why. This is the foundation of GitOps.
 
@@ -91,11 +92,13 @@ Everything is tracked — who changed what, when, and why. This is the foundatio
 
 ## Stage 3: CI Pipeline — GitHub Actions
 
-On every push to `main`, GitHub Actions builds Docker images for all 7 services in parallel and pushes them to Amazon ECR.
+When you run the pipeline, GitHub Actions builds Docker images for all 7 services in parallel and pushes them to Amazon ECR.
+
+The pipeline uses a **manual trigger** (`workflow_dispatch`) rather than running on every push — so documentation commits and work-in-progress don't burn build minutes or roll out a deployment. To switch to fully automatic CI, change `on: workflow_dispatch` to `on: push: branches: [main]` in `ci.yml`.
 
 ```mermaid
 flowchart TD
-    Push[Push to main] --> Trigger[GitHub Actions triggered]
+    Push[Run workflow — Actions tab] --> Trigger[GitHub Actions triggered]
 
     Trigger --> B1[Build auth]
     Trigger --> B2[Build gateway]
@@ -116,7 +119,7 @@ flowchart TD
 - The `update-manifests` job patches the image tag in every Kubernetes manifest and commits the change back
 - This commit is what ArgoCD detects to trigger a rollout
 
-**Where to check:** GitHub repo → **Actions** tab → **Boutique CI Pipeline**
+**Where to run and check:** GitHub repo → **Actions** tab → **Boutique CI Pipeline** → **Run workflow**
 
 ---
 
@@ -162,7 +165,7 @@ sequenceDiagram
     participant EKS as EKS Cluster
 
     Dev->>GH: git push
-    GH->>CI: trigger pipeline
+    Dev->>CI: run workflow (manual trigger)
     CI->>ECR: docker push (new image)
     CI->>GH: commit updated image tag
     Argo->>GH: polls every 3 mins / webhook
@@ -178,9 +181,10 @@ sequenceDiagram
 - Every deployment is auditable — it's just a Git commit
 
 **Key files:**
-- `gitops/argo-cd.yml` — registers the repo and branch with ArgoCD
+- `gitops/argo-cd.yml` — registers the repo and branch with ArgoCD, with automated sync (`prune` + `selfHeal`) enabled
 - `gitops/kustomization.yml` — lists all Kubernetes resources to apply
-- `gitops/k8s/` — all service deployments, services, database, secrets
+- `gitops/k8s/` — all service deployments, services, and the database
+- `gitops/secrets.yml` — database credentials as a Kubernetes Secret
 
 ---
 
@@ -218,6 +222,7 @@ flowchart LR
 - Grafana is pre-loaded with a boutique dashboard via a ConfigMap labelled `grafana_dashboard: "1"` — the Grafana sidecar auto-imports it
 
 **Logs — Fluent Bit + CloudWatch**
+- Fluent Bit is **not** provisioned by Terraform or ArgoCD — install it once by hand with the `aws-for-fluent-bit` Helm chart (see `projects/README.md`)
 - Fluent Bit runs as a DaemonSet in `amazon-cloudwatch`
 - Captures stdout from every pod and ships logs to CloudWatch
 - Log group: `/eks/boutique/pods`
@@ -272,7 +277,7 @@ sequenceDiagram
     Kira->>Metrics: Check order-service memory last 30m
     Metrics-->>Kira: Memory spiked to 512MB, OOM kill at 22:14
     Note over Kira: Step 4: Correlate evidence
-    Kira->>Eng: Root cause: OOM kill at 22:14 due to memory spike.\nEvidence: logs show 503s starting at 22:14, pod restarting,\nmetrics confirm memory exceeded limit.\nFix: Increase memory limit in orders.yml to 768Mi.\nPrevention: Add VPA + memory alerting rule.
+    Kira->>Eng: Root cause: OOM kill at 22:14 due to memory spike.\nEvidence: logs show 503s starting at 22:14, pod restarting,\nmetrics confirm memory exceeded limit.\nFix: Increase memory limit in order-service.yml to 768Mi.\nPrevention: Add VPA + memory alerting rule.
 ```
 
 **The Kira workflow:**
@@ -282,7 +287,7 @@ sequenceDiagram
 4. Correlates data across all three sources
 5. Returns root cause, supporting evidence, immediate fix, and prevention steps
 
-**Kira never guesses.** Every conclusion is backed by specific log entries or metric values.
+**Kira is instructed to show its evidence.** Every conclusion should cite specific log entries or metric values — and like any AI output, it's a starting point for the engineer to verify, not a verdict to apply blindly.
 
 ---
 
@@ -292,7 +297,7 @@ sequenceDiagram
 flowchart TD
     Dev[👩‍💻 Developer] -->|writes code| Local[Docker Compose\nLocal Testing]
     Local -->|git push| GH[GitHub main branch]
-    GH -->|triggers| CI[GitHub Actions\nBuild + Push to ECR]
+    GH -->|manual run| CI[GitHub Actions\nBuild + Push to ECR]
     CI -->|commits image tags| GH
     GH -->|ArgoCD detects change| Argo[ArgoCD\nRolling Deploy to EKS]
     Argo --> EKS[EKS Cluster\n7 microservices]

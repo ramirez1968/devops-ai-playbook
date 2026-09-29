@@ -308,8 +308,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Tools Available:**")
     st.markdown("- 📋 `fetch_logs` — CloudWatch Logs")
-    st.markdown("- 📊 `fetch_metrics` — CloudWatch Metrics")
-    st.markdown("- 🏥 `fetch_service_health` — ECS/RDS/ALB")
+    st.markdown("- 📊 `fetch_metrics` — Prometheus Metrics")
+    st.markdown("- 🏥 `fetch_service_health` — EKS cluster, nodes, pods")
 
     st.markdown("---")
     st.markdown("**Sample Questions:**")
