@@ -63,16 +63,15 @@ Three things are set up:
 
 **CLAUDE.md** — a project instruction file at the repo root that Claude reads automatically at the start of every session. It puts Claude in safe execution mode: explain what you're about to do and why before taking any action. This is important when working with live AWS infrastructure where silent commands can have real consequences.
 
-**MCP Servers** — background processes that extend Claude's built-in capabilities. Four servers are configured in `~/.claude/settings.json`:
+**MCP Servers** — background processes that extend Claude's built-in capabilities. Three servers are registered with `claude mcp add` (stored in `~/.claude.json`):
 
 | Server | What it unlocks |
 |--------|----------------|
 | `awslabs.eks-mcp-server` | Query EKS clusters, inspect pods, stream logs, apply manifests |
-| `awslabs.terraform-mcp-server` | Run Terraform commands, search provider docs, run Checkov scans |
+| `hashicorp/terraform-mcp-server` | Search Terraform provider docs, modules, and policies (runs in Docker) |
 | `awslabs.aws-pricing-mcp-server` | Live AWS pricing lookups and cost analysis reports |
-| `awslabs.core-mcp-server` | MCP orchestration layer (deprecated, kept for compatibility) |
 
-**Skills** — domain-specific knowledge packs that improve how Claude reasons about certain topics. The `terraform-skill` is installed, giving Claude deeper context for Terraform module patterns, testing strategies, security scanning, and CI/CD workflows specific to infrastructure-as-code.
+**Skills** — domain-specific knowledge packs that improve how Claude reasons about certain topics. A Terraform skill (see Step 5 of the setup doc) gives Claude deeper context for Terraform module patterns, testing strategies, security scanning, and CI/CD workflows specific to infrastructure-as-code.
 
 ---
 

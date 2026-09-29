@@ -1,6 +1,6 @@
 # Claude Code Setup
 
-This project uses [Claude Code](https://claude.ai/claude-code) — Anthropic's AI coding assistant — as a hands-on tool throughout the DevOps workflow. This document covers how Claude is configured in this project: the `CLAUDE.md` instruction file and the MCP servers that extend its capabilities.
+This project uses [Claude Code](https://code.claude.com/docs) — Anthropic's AI coding assistant — as a hands-on tool throughout the DevOps workflow. This document covers how Claude is configured in this project: the `CLAUDE.md` instruction file and the MCP servers that extend its capabilities.
 
 ---
 
@@ -75,32 +75,42 @@ MCP (Model Context Protocol) servers extend Claude's capabilities beyond the bui
 
 Claude will use this server to check pod events, read logs, and inspect the deployment spec — without you running any kubectl commands manually.
 
-**Setup requirement:** Your AWS credentials must have EKS read permissions. The IAM policy `AmazonEKSClusterPolicy` on your user or role is sufficient for read-only operations.
+**Read-only by default:** Out of the box the server can only describe and list resources. Two opt-in flags unlock the rest:
+
+| Flag | Unlocks |
+|------|---------|
+| `--allow-sensitive-data-access` | Pod logs, Kubernetes events, and Secrets |
+| `--allow-write` | Applying manifests and creating, updating, or deleting resources |
+
+This project's setup (Step 4) enables both so Claude can troubleshoot and deploy. Leave off `--allow-write` if you only want Claude to look, never change.
+
+**Setup requirement:** Your AWS identity needs two things:
+1. **IAM permissions** for the calls the server makes — for read-only use, actions such as `eks:DescribeCluster`, `eks:ListClusters`, `ec2:DescribeVpcs`, `cloudformation:DescribeStacks`, `cloudwatch:GetMetricData`, and `logs:StartQuery` / `logs:GetQueryResults`. (Note: `AmazonEKSClusterPolicy` is for the EKS cluster's *service role*, not for your user.)
+2. **Access inside the cluster** — an [EKS access entry](https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html) for your IAM user or role (e.g. `AmazonEKSViewPolicy` for read-only, `AmazonEKSClusterAdminPolicy` for write). Without it, the AWS calls succeed but Kubernetes denies every request.
 
 ---
 
-### awslabs.terraform-mcp-server
+### terraform (HashiCorp terraform-mcp-server)
 
-**What it does:** Gives Claude the ability to run Terraform commands and search provider documentation.
+**What it does:** Gives Claude live access to the Terraform Registry — provider docs, modules, and policies — so it works from current resource schemas instead of memory. Runs in Docker.
 
 **Key capabilities:**
-- Run `terraform init`, `plan`, `apply`, `validate`, and `destroy`
-- Search AWS and AWSCC provider resource documentation
-- Search AWS-IA Terraform modules (Bedrock, OpenSearch, SageMaker)
-- Run Checkov security scans on Terraform code
-- Analyse existing modules from the Terraform Registry
+- Search provider resource documentation (AWS, AWSCC, Kubernetes, Helm, …)
+- Search and inspect modules from the public Terraform Registry
+- Search Sentinel/OPA policies
+- Manage HCP Terraform / Terraform Enterprise workspaces and runs (optional — needs `TFE_TOKEN`)
 
 **Example use in this project:**
 
 > "What Terraform resource do I need to create an EKS node group?"
 
-Claude will search the AWSCC and AWS provider docs and return the correct resource schema and example usage.
+Claude will search the AWS provider docs and return the correct resource schema and example usage.
 
 > "Run terraform plan in the Infrastructure directory"
 
-Claude will execute it and summarise what will be created, changed, or destroyed.
+This one doesn't go through the MCP server — the server doesn't run local Terraform. Claude runs `terraform plan` directly in its terminal (Terraform must be installed) and summarises what will be created, changed, or destroyed. The same goes for Checkov: if `checkov` is installed, Claude can run `checkov -d projects/Infrastructure` directly.
 
-**Note:** This server is deprecated in favour of HashiCorp's official Terraform MCP server, but remains functional.
+> **Why not `awslabs.terraform-mcp-server`?** Earlier versions of this setup used it, but AWS has withdrawn every version from PyPI in favour of HashiCorp's server — `uvx` can no longer install it.
 
 ---
 
@@ -127,11 +137,9 @@ Claude will look up the Qwen model pricing and factor in the Lambda invocations 
 
 ---
 
-### awslabs.core-mcp-server
+### What about awslabs.core-mcp-server?
 
-**What it does:** A proxy/orchestration layer that coordinates the other MCP servers. It allows Claude to route requests to the right server automatically.
-
-**Note:** This server is deprecated. Modern Claude Code clients support multi-server configurations natively, so each server above is registered directly. It is kept here for backwards compatibility but will be removed in a future update. You can safely remove it from your config if all other servers are registered individually.
+Earlier versions of this setup included `awslabs.core-mcp-server`, a proxy that routed requests to the other AWS servers. AWS has withdrawn every version from PyPI ("load individual MCPs"), so it can no longer be installed. It isn't needed: Claude Code talks to each server above directly.
 
 ---
 
@@ -140,6 +148,10 @@ Claude will look up the Qwen model pricing and factor in the Lambda invocations 
 ### Step 1 — Install Claude Code
 
 ```bash
+# macOS, Linux, WSL (recommended — auto-updates in the background)
+curl -fsSL https://claude.ai/install.sh | bash
+
+# or via npm (requires Node.js 22+, no auto-update)
 npm install -g @anthropic-ai/claude-code
 ```
 
@@ -181,7 +193,7 @@ aws sts get-caller-identity
 
 You should see your account ID, user ID, and ARN returned. If this fails, the AWS MCP servers will not connect.
 
-> If you're using AWS SSO or named profiles, set `AWS_PROFILE` in `~/.claude/settings.json` to match your profile name.
+> If you're using AWS SSO or named profiles, pass `-e AWS_PROFILE=<name>` when registering each server in Step 4.
 
 ---
 
@@ -190,11 +202,11 @@ You should see your account ID, user ID, and ARN returned. If this fails, the AW
 `uv` is the Python package runner that launches the AWS MCP servers automatically.
 
 ```bash
-# macOS
-brew install uv
+# Linux / WSL / macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# or via pip
-pip install uv
+# or macOS with Homebrew
+brew install uv
 ```
 
 Verify:
@@ -207,68 +219,49 @@ uvx --version
 
 ### Step 4 — Configure MCP Servers
 
-Create or edit `~/.claude/settings.json` with the following:
+Register each server with `claude mcp add`. The `-s user` flag makes it available in every project on your machine:
 
-```json
-{
-  "mcpServers": {
-    "awslabs.core-mcp-server": {
-      "command": "uvx",
-      "args": ["awslabs.core-mcp-server@latest"],
-      "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      }
-    },
-    "awslabs.terraform-mcp-server": {
-      "command": "uvx",
-      "args": ["awslabs.terraform-mcp-server@latest"],
-      "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      }
-    },
-    "awslabs.aws-pricing-mcp-server": {
-      "command": "uvx",
-      "args": ["awslabs.aws-pricing-mcp-server@latest"],
-      "env": {
-        "AWS_REGION": "us-east-1",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      }
-    },
-    "awslabs.eks-mcp-server": {
-      "command": "uvx",
-      "args": ["awslabs.eks-mcp-server@latest"],
-      "env": {
-        "AWS_REGION": "us-east-1",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      }
-    }
-  }
-}
+```bash
+claude mcp add terraform -s user \
+  -- docker run -i --rm hashicorp/terraform-mcp-server
+
+claude mcp add awslabs-aws-pricing-mcp-server -s user \
+  -e AWS_REGION=us-east-1 -e FASTMCP_LOG_LEVEL=ERROR \
+  -- uvx awslabs.aws-pricing-mcp-server@latest
+
+claude mcp add awslabs-eks-mcp-server -s user \
+  -e AWS_REGION=us-east-1 -e FASTMCP_LOG_LEVEL=ERROR \
+  -- uvx awslabs.eks-mcp-server@latest --allow-write --allow-sensitive-data-access
 ```
 
-> Replace `us-east-1` with your AWS region. Replace `default` with your AWS profile name if using named profiles or SSO.
+> Replace `us-east-1` with your AWS region. Add `-e AWS_PROFILE=<name>` to any server if you use named profiles or SSO.
+>
+> Server names (right after `claude mcp add`) may only use letters, numbers, hyphens, and underscores — so it's `awslabs-eks-mcp-server`, even though the package name after `uvx` is `awslabs.eks-mcp-server`.
+
+The Terraform server needs Docker running (`docker info` should succeed). The two AWS servers need `uv` (Step 3).
+
+These commands write to `~/.claude.json`. Check the result anytime with `claude mcp list`, and remove a server with `claude mcp remove <name> -s user`.
+
+> ⚠️ **Don't put MCP servers in `~/.claude/settings.json`.** Claude Code does not read an `mcpServers` block from that file — servers defined there are silently ignored. MCP servers live in `~/.claude.json` (user/local scope, managed by `claude mcp add`) or in a `.mcp.json` file at the project root (project scope, shareable via Git).
 
 ---
 
 ### Step 5 — Install the Terraform Skill
 
-Skills are domain-specific knowledge packs that give Claude deeper context for specific tools. Install the Terraform skill:
+Skills are domain-specific knowledge packs that give Claude deeper context for specific tools. A skill is simply a folder containing a `SKILL.md` file — there is no `claude skills install` command. Install one in either of two ways:
 
-```bash
-claude skills install terraform-skill
-```
+- **As a personal skill:** copy the skill's folder to `~/.claude/skills/terraform-skill/` (so the file is at `~/.claude/skills/terraform-skill/SKILL.md`). It's then available in every project on your machine.
+- **From a plugin marketplace:** inside a Claude Code session, run `/plugin`, browse the marketplace, and install a plugin that includes a Terraform skill.
 
 This gives Claude richer context for Terraform module patterns, security scanning with Checkov, testing strategies, and CI/CD workflows — beyond what's in its base training.
 
-Verify it installed:
+Verify it installed — inside a Claude Code session, run:
 
-```bash
-claude skills list
+```
+/skills
 ```
 
-You should see `terraform-skill` listed.
+You should see `terraform-skill` listed. Claude Code picks up new skill folders automatically, without a restart.
 
 ---
 
@@ -302,13 +295,15 @@ Check which MCP servers are connected:
 /mcp
 ```
 
-You should see all four servers listed as `connected`. If any show as `failed`:
+You should see all three servers listed as `connected`. If any show as `failed`:
 
 | Problem | Fix |
 |---------|-----|
 | AWS server shows `failed` | Run `aws sts get-caller-identity` to verify credentials |
-| Wrong region errors | Update `AWS_REGION` in `~/.claude/settings.json` |
-| `uvx: command not found` | Run `brew install uv` |
+| No servers listed at all | They're probably in `~/.claude/settings.json`, which is ignored — re-register them with `claude mcp add` (Step 4) |
+| Wrong region errors | `claude mcp remove <name> -s user`, then re-add it with the correct `-e AWS_REGION=...` |
+| EKS server can't read logs or apply manifests | Re-add it with `--allow-sensitive-data-access` and/or `--allow-write` (Step 4) |
+| `uvx: command not found` | Run `curl -LsSf https://astral.sh/uv/install.sh \| sh` (or `brew install uv` on macOS), then open a new terminal |
 | Server times out on first use | Normal — `uvx` downloads the server on first run, retry after ~30s |
 
 ---
@@ -319,8 +314,8 @@ You should see all four servers listed as `connected`. If any show as `failed`:
 |------|----------------|
 | Check pod logs / health | `eks-mcp-server` |
 | Apply k8s manifests | `eks-mcp-server` |
-| Run terraform plan/apply | `terraform-mcp-server` |
-| Search provider docs | `terraform-mcp-server` |
+| Run terraform plan/apply | Built-in terminal (`terraform` CLI) |
+| Search provider docs | `terraform` (HashiCorp) |
 | Estimate infrastructure cost | `aws-pricing-mcp-server` |
 | Bedrock agent cost analysis | `aws-pricing-mcp-server` |
 | Cluster and node group info | `eks-mcp-server` |
