@@ -326,7 +326,7 @@ Every tool in this project exists to solve one of these problems:
 | Traffic distribution | Load Balancing | ClusterIP + ALB |
 | Handling failures | High Availability | Multi-AZ subnets |
 | Handling traffic spikes | Autoscaling | Fixed replicas today (HPA + KEDA as next step) |
-| Containers crashing | Self-healing | ReplicaSets (+ probes on the database StatefulSet) |
+| Containers crashing | Self-healing | ReplicaSets + readiness probes on every service |
 | Credential leaks | Security | IAM + Secrets + JWT |
 | Finding the bottleneck | Observability | Prometheus + Grafana + CloudWatch |
 | Releasing safely | Deployment Strategies | Rolling updates |

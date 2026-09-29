@@ -18,6 +18,14 @@ spec:
           image: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/frontend:1ebec3729cd10fe1eeac6f0858fba58e2da07956
           ports:
             - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           env:
             - name: REACT_APP_API_URL
               value: "http://gateway:3001/api"
