@@ -63,7 +63,7 @@ Now you can scale only the services that need it. A bug in one service doesn't c
 
 **The tradeoff:** Now you have network calls between services instead of in-memory function calls. You have distributed data, more moving parts, and operational complexity.
 
-**In this project:** We have 7 services — gateway, auth, product-service, order-service, orders, user-service, and frontend. Each has its own Dockerfile, its own Kubernetes deployment, and its own PostgreSQL database. They communicate through the gateway.
+**In this project:** We have 7 services — gateway, auth, product-service, order-service, orders, user-service, and frontend. Order handling is split in two: `order-service` owns the cart and checkout flow, while `orders` owns order history and management — a small example of splitting by business capability. Each has its own Dockerfile and its own Kubernetes deployment. For data, auth, product-service, and user-service each get their own database (`auth_db`, `products_db`, `users_db`), while `order-service` and `orders` share `orders_db`; the gateway and frontend are stateless. All four databases live on a single PostgreSQL StatefulSet — a pragmatic compromise, since in a strict microservices setup every service would own its data. They communicate through the gateway.
 
 ---
 
@@ -325,8 +325,8 @@ Every tool in this project exists to solve one of these problems:
 | Services finding each other | Service Discovery | Kubernetes DNS |
 | Traffic distribution | Load Balancing | ClusterIP + ALB |
 | Handling failures | High Availability | Multi-AZ subnets |
-| Handling traffic spikes | Autoscaling | HPA + KEDA |
-| Containers crashing | Self-healing | Kubernetes probes + ReplicaSets |
+| Handling traffic spikes | Autoscaling | Fixed replicas today (HPA + KEDA as next step) |
+| Containers crashing | Self-healing | ReplicaSets (+ probes on the database StatefulSet) |
 | Credential leaks | Security | IAM + Secrets + JWT |
 | Finding the bottleneck | Observability | Prometheus + Grafana + CloudWatch |
 | Releasing safely | Deployment Strategies | Rolling updates |
