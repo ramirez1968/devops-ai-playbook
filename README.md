@@ -33,6 +33,7 @@ By the end of this series, you won't just know tools — you'll understand how r
 ```
 DevOps-Practice-Guide/
 ├── docs/
+│   ├── part1-beginner-concepts.md # Optional beginner primer (read before Part 1)
 │   ├── part1-system-design.md     # System design foundations (Part 1)
 │   ├── part2-workflow.md          # Full workflow with AIOps (Part 2)
 │   └── claude-setup.md            # Claude Code + MCP server setup
@@ -81,6 +82,8 @@ Three things are set up:
 We start with system design concepts specifically for cloud and DevOps. This is important whether you're a beginner, intermediate, or senior engineer — because companies don't choose tools randomly. They think about architecture patterns, deployment strategies, scalability, reliability, and cost tradeoffs.
 
 We cover 12 core system design pillars used in modern DevOps architectures, and connect each one directly to something running in this project.
+
+> **New to DevOps?** Start with the optional primer [`docs/part1-beginner-concepts.md`](docs/part1-beginner-concepts.md) — Git, Linux, Docker, CI/CD, IaC, and a key terms glossary.
 
 ---
 

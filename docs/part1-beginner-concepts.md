@@ -1,6 +1,8 @@
 # Part 1 — Beginner Concepts You Need to Know
 
-> Companion doc for the YouTube series: **DevOps Practice Guide** — Episode 1 (8 min)
+> Companion doc for the YouTube series: **DevOps + AIOps Series** — Part 1 (beginner primer)
+>
+> New to DevOps? Read this first, then continue to [System Design Foundations](./part1-system-design.md).
 
 ---
 
@@ -75,6 +77,7 @@ Instead of clicking through a cloud console, you define infrastructure in files 
 ---
 
 ## Where to Go Next
+- [Part 1 — System Design Foundations](./part1-system-design.md): the 12 design pillars behind this project
 - [Part 2 — The DevOps Workflow](./part2-workflow.md): local → cloud deployment walkthrough
-- Explore the pipeline config: `.github/workflows/`
-- Run the app locally: `projects/fullstack-cicd-pipeline/`
+- Explore the pipeline config: `.github/workflows/ci.yml`
+- Run the app locally: `projects/boutique-microservices/` (`docker compose up`)
