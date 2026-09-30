@@ -8,6 +8,35 @@ const router = express.Router();
 const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003';
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 
+// Pricing rules shown in the cart; the server is the source of truth.
+const FREE_SHIPPING_OVER = 500;
+const SHIPPING_FEE = 15;
+const TAX_RATE = 0.08;
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+function priceTotals(subtotal: number) {
+  const shipping = subtotal > FREE_SHIPPING_OVER ? 0 : SHIPPING_FEE;
+  const tax = cents(subtotal * TAX_RATE);
+  return { subtotal: cents(subtotal), shipping, tax, total: cents(subtotal + shipping + tax) };
+}
+
+function parseAddress(value: any) {
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch { return { street: value }; }
+}
+
+// Product from product-service, or null if it doesn't exist.
+async function fetchProduct(productId: string) {
+  try {
+    const res = await axios.get(`${PRODUCTS_SERVICE_URL}/${productId}`);
+    return res.data.data;
+  } catch (err: any) {
+    const status = err.response?.status;
+    if (status === 404 || status === 400 || status === 500) return null; // product-service returns 500 for malformed IDs
+    throw err;
+  }
+}
+
 router.post('/', requireUser, async (req, res) => {
   try {
     // The user comes from the verified token, never from the request body.
@@ -21,14 +50,16 @@ router.post('/', requireUser, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Each quantity must be a whole number from 1 to 100' });
     }
 
-    let totalAmount = 0;
+    let subtotal = 0;
     const orderItems: any[] = [];
 
     for (const item of items) {
-      const productResponse = await axios.get(`${PRODUCTS_SERVICE_URL}/${item.productId}`);
-      const product = productResponse.data.data;
+      const product = await fetchProduct(item.productId);
+      if (!product) {
+        return res.status(400).json({ success: false, error: `Product not found: ${item.productId}` });
+      }
 
-      totalAmount += product.price * item.quantity;
+      subtotal += Number(product.price) * item.quantity;
 
       orderItems.push({
         product_id: item.productId,
@@ -41,7 +72,7 @@ router.post('/', requireUser, async (req, res) => {
       INSERT INTO orders (user_id, total_amount, status, shipping_address, payment_status, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *
-    `, [userId, totalAmount, 'pending', JSON.stringify(shippingAddress), 'pending']);
+    `, [userId, priceTotals(subtotal).total, 'pending', JSON.stringify(shippingAddress), 'pending']);
 
     const order = result.rows[0];
 
@@ -67,7 +98,7 @@ router.post('/', requireUser, async (req, res) => {
           quantity: item.quantity,
           price: item.price
         })),
-        totalAmount: order.total_amount,
+        totalAmount: Number(order.total_amount),
         status: order.status,
         shippingAddress: shippingAddress,
         paymentStatus: order.payment_status,
@@ -104,9 +135,34 @@ router.get('/my-orders', requireUser, async (req, res) => {
       ORDER BY o.created_at DESC
     `, [userId]);
 
+    // Attach product name and image to each item (one lookup per distinct product).
+    const productIds = Array.from(new Set(
+      result.rows.flatMap((o: any) => (o.items || []).filter((i: any) => i && i.productId).map((i: any) => i.productId))
+    )) as string[];
+    const products = new Map<string, any>();
+    await Promise.all(productIds.map(async id => products.set(id, await fetchProduct(id))));
+
+    const orders = result.rows.map((o: any) => ({
+      id: o.id,
+      userId: o.user_id,
+      items: (o.items || []).filter((i: any) => i && i.id).map((i: any) => {
+        const p = products.get(i.productId);
+        return {
+          ...i,
+          product: { id: i.productId, name: p?.name ?? 'Unavailable product', imageUrl: p?.image_url ?? '' },
+        };
+      }),
+      totalAmount: Number(o.total_amount),
+      status: o.status,
+      shippingAddress: parseAddress(o.shipping_address),
+      paymentStatus: o.payment_status,
+      createdAt: o.created_at,
+      updatedAt: o.updated_at,
+    }));
+
     const response: ServiceResponse<Order[]> = {
       success: true,
-      data: result.rows
+      data: orders
     };
 
     res.json(response);

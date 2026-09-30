@@ -13,6 +13,7 @@ import Login from './pages/Login/Login';
 import Register from './pages/Register/Register';
 import Profile from './pages/Profile/Profile';
 import Orders from './pages/Orders/Orders';
+import Checkout from './pages/Checkout/Checkout';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 
 const theme = createTheme({
@@ -271,6 +272,14 @@ function App() {
                 <Route path="products" element={<Products />} />
                 <Route path="products/:id" element={<ProductDetail />} />
                 <Route path="cart" element={<Cart />} />
+                <Route
+                  path="checkout"
+                  element={
+                    <ProtectedRoute>
+                      <Checkout />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route

@@ -182,6 +182,8 @@ Found in local testing (2026-09-29). Not fixed yet. Many of the high-severity it
 
 #### 7. No Checkout in the Frontend
 
+- **Status**: ✅ Fixed: new protected `/checkout` page (address form, summary, place order) and a working Orders page. The orders API now returns camelCase fields with product names/images, `orderService` unwraps `{success, data}`, and the server computes the total with the cart's shipping (free over $500, else $15) and 8% tax rules.
+
 - **Problem**: Clicking **Checkout** returns to the Home page. The Orders page shows an error.
 - **Root Cause**: `Cart.tsx` navigates to `/checkout`, but no such page or route exists, so the router's catch-all redirects home. `orderService.createOrder()` is never called. The Orders page calls `my-orders` without a user, so orders falls back to the invalid `demo-user-id`.
 - **Proposed Fix**: Build a Checkout page after the identity fix (#2, #5, #6), since it depends on how the user is identified.
@@ -232,6 +234,8 @@ Found in local testing (2026-09-29). Not fixed yet. Many of the high-severity it
 ### Low Severity and Cleanup
 
 #### 14. Bad Input Returns 500
+
+- **Status**: 🟡 Partly fixed: orders returns `400 Product not found` for unknown products, and bad tokens return `401`. Invalid product IDs in product-service still return `500`.
 
 - **Problem**: Invalid product IDs, unknown products in orders, and malformed tokens return `500` instead of `400`/`401`/`404`. The gateway returns `500` when a service is down (should be `502`/`503`). These inflate 5xx error rates in Grafana.
 

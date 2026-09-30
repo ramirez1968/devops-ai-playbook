@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
+  Alert,
   Container,
   Typography,
   Box,
@@ -43,6 +44,7 @@ import LoadingSkeleton from '../../components/common/LoadingSkeleton';
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const placedOrderId = (useLocation().state as { placedOrderId?: string } | null)?.placedOrderId;
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +134,12 @@ const Orders: React.FC = () => {
             Orders
           </Typography>
         </Breadcrumbs>
+
+        {placedOrderId && (
+          <Alert severity="success" sx={{ mb: 3 }}>
+            Order #{placedOrderId.slice(-8)} placed. Thank you!
+          </Alert>
+        )}
 
         <Typography variant="h3" component="h1" gutterBottom>
           My Orders
