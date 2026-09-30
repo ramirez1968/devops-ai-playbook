@@ -44,3 +44,8 @@ variable "disk_size" {
   type        = number
   default     = 20
 }
+
+variable "node_subnet_ids" {
+  description = "Subnets for the worker nodes (private subnets)"
+  type        = list(string)
+}

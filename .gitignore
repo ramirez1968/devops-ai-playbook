@@ -37,3 +37,6 @@ Thumbs.db
 
 # Python virtual environments
 .venv/
+
+# Local-only Terraform values (e.g. your IP for the ALB allow-list)
+*.auto.tfvars

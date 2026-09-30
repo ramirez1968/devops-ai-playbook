@@ -98,7 +98,7 @@ resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.eks.name
   node_group_name = var.node_group_name
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids      = var.subnet_ids
+  subnet_ids      = var.node_subnet_ids
 
   # Keep nodes on the same Kubernetes version as the control plane.
   version = aws_eks_cluster.eks.version
@@ -115,6 +115,12 @@ resource "aws_eks_node_group" "node_group" {
 
   update_config {
     max_unavailable = 1
+  }
+
+  # Changing subnets or the name replaces the node group. Build the new one
+  # first so EKS can drain pods onto it before the old one is deleted.
+  lifecycle {
+    create_before_destroy = true
   }
 
   tags = {

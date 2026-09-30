@@ -65,3 +65,17 @@ variable "disk_size" {
 variable "repositories" {
   type = list(string)
 }
+variable "private_subnet_cidrs" {
+  description = "One private subnet per availability zone, same order as var.subnets"
+  type        = list(string)
+}
+
+variable "node_availability_zones" {
+  description = "Zones the worker nodes run in. Must include the zone of the Postgres EBS volume."
+  type        = list(string)
+}
+
+variable "alb_allowed_cidrs" {
+  description = "Addresses allowed to reach the public ALB. Set in local.auto.tfvars (not committed)."
+  type        = list(string)
+}

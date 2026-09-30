@@ -22,7 +22,7 @@ subnets = [
 ]
 
 cluster_name    = "eks-cluster"
-node_group_name = "eks-node-group"
+node_group_name = "eks-nodes-private"
 
 instance_types = ["m7i-flex.large"]
 capacity_type  = "ON_DEMAND"
@@ -42,3 +42,8 @@ repositories = [
   "product-service",
   "user-service"
 ]
+private_subnet_cidrs = ["10.1.11.0/24", "10.1.12.0/24", "10.1.13.0/24"]
+
+# Postgres' EBS volume lives in us-east-1b, so a node must always run there.
+# Two zones with two nodes puts one node in each.
+node_availability_zones = ["us-east-1a", "us-east-1b"]

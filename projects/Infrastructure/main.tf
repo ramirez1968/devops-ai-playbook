@@ -6,6 +6,8 @@ module "vpc" {
   subnet_cidrs       = [for s in var.subnets : s.cidr_block]
   availability_zones = [for s in var.subnets : s.availability_zone]
   cluster_name       = var.cluster_name
+
+  private_subnet_cidrs = var.private_subnet_cidrs
 }
 
 
@@ -23,6 +25,10 @@ module "eks" {
   max_size       = var.max_size
 
   subnet_ids = module.vpc.subnet_ids
+  node_subnet_ids = [
+    for i, az in module.vpc.availability_zones : module.vpc.private_subnet_ids[i]
+    if contains(var.node_availability_zones, az)
+  ]
   depends_on = [module.vpc]
 }
 
