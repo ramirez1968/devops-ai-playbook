@@ -26,6 +26,14 @@
 
 - **Solution**: Switched both providers in `main.tf` to `exec` authentication (`aws eks get-token`), which fetches a fresh token on every connection. A second apply created the remaining 4 resources.
 
+### 4. Drift After Upgrading the Cluster in the Console
+
+- **Problem**: The next `terraform plan` wanted to change the EKS cluster `1.35 -> 1.34`, plus the OIDC provider and EBS role. The node group showed `DEGRADED`.
+
+- **Root Cause**: The cluster was upgraded to 1.35 with the console's upgrade button (CloudTrail: `UpdateClusterVersion`), while the code still said 1.34. EKS can't downgrade, so that apply would have failed. The `DEGRADED` status was a stale "cluster is going through a config update" message from the upgrade.
+
+- **Solution**: Set the cluster to `1.35` in `modules/eks/main.tf` and made the node group follow it (`version = aws_eks_cluster.eks.version`), which rolled both nodes to 1.35. Lesson: once Terraform owns the infrastructure, make changes in code, not the console.
+
 ---
 
 ## Database Issue

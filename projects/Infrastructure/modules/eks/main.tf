@@ -25,7 +25,7 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
 resource "aws_eks_cluster" "eks" {
   name     = var.cluster_name
   role_arn = aws_iam_role.eks_cluster_role.arn
-  version  = "1.34"
+  version  = "1.35"
 
   vpc_config {
     subnet_ids              = var.subnet_ids
@@ -90,6 +90,9 @@ resource "aws_eks_node_group" "node_group" {
   node_group_name = var.node_group_name
   node_role_arn   = aws_iam_role.eks_node_role.arn
   subnet_ids      = var.subnet_ids
+
+  # Keep nodes on the same Kubernetes version as the control plane.
+  version = aws_eks_cluster.eks.version
 
   instance_types = var.instance_types
   capacity_type  = var.capacity_type
