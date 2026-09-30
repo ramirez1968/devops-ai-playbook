@@ -84,6 +84,7 @@ const Home: React.FC = () => {
                       fontWeight: 700,
                       mb: 3,
                       fontSize: { xs: '2.5rem', md: '3.5rem' },
+                      color: '#ffffff', // theme headings are dark; this banner is dark too
                     }}
                   >
                     Discover Timeless
@@ -98,7 +99,7 @@ const Home: React.FC = () => {
                       mb: 4,
                       lineHeight: 1.6,
                       fontWeight: 300,
-                      opacity: 0.9,
+                      color: 'rgba(255, 255, 255, 0.85)',
                     }}
                   >
                     Indulge in our curated collection of luxury products, 
@@ -111,12 +112,14 @@ const Home: React.FC = () => {
                       endIcon={<ShoppingBagIcon />}
                       href="/products"
                       sx={{
-                        backgroundColor: '#d4af37',
+                        // `background` (not backgroundColor) to override the theme's
+                        // dark gradient on contained buttons
+                        background: '#d4af37',
                         color: '#1a1a1a',
                         px: 4,
                         py: 1.5,
                         '&:hover': {
-                          backgroundColor: '#b8941f',
+                          background: '#b8941f',
                         },
                       }}
                     >
