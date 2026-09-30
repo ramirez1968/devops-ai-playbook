@@ -196,6 +196,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Locally the browser calls the gateway's published port.
+        REACT_APP_API_URL: http://localhost:3001/api
     container_name: boutique-frontend
     ports:
       - "3000:3000"

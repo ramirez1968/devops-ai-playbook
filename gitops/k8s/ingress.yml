@@ -1,0 +1,35 @@
+# Public entry point. The AWS Load Balancer Controller turns this into an
+# internet-facing ALB with one target group per backend Service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: boutique
+  namespace: boutique
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # Use Terraform's allow-list group (boutique-alb-allowed) instead of an
+    # open-to-the-world one; the controller still opens ALB -> pod traffic.
+    alb.ingress.kubernetes.io/security-groups: boutique-alb-allowed
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 3001
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000
