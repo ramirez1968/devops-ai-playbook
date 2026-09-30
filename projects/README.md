@@ -31,27 +31,31 @@ This guide walks through the full deployment of the boutique e-commerce applicat
                                     │   Gateway   │
                                     │ (Port 3001) │
                                     └──────┬──────┘
-                                           │
-            ┌──────────────────────────────┼──────────────────────────────┐
-            │                              │                              │
-     ┌──────▼──────┐              ┌────────▼──────┐             ┌────────▼──────┐
-     │    Auth     │              │Product Service│             │  User Service │
-     │ (Port 3002) │              │  (Port 3003)  │             │  (Port 3006)  │
-     └──────┬──────┘              └───────┬───────┘             └───────┬───────┘
-            │                             │
-     ┌──────▼──────┐              ┌───────▼───────┐
-     │Order Service│              │    Orders     │
-     │ (Port 3004) │              │  (Port 3005)  │
-     └──────┬──────┘              └───────────────┘
-            │
-     ┌──────▼──────┐
-     │  PostgreSQL │
-     │ (Port 5432) │
-     └─────────────┘
+             /api/auth    /api/products    │    /api/orders     /api/users
+          ┌──────────────────┬─────────────┴──────┬──────────────────┐
+          │                  │                    │                  │
+   ┌──────▼──────┐  ┌────────▼──────┐    ┌────────▼──────┐  ┌────────▼──────┐
+   │    Auth     │  │Product Service│    │    Orders     │  │  User Service │
+   │ (Port 3002) │  │  (Port 3003)  │    │  (Port 3005)  │  │  (Port 3006)  │
+   └──────┬──────┘  └───────┬───────┘    └───────┬───────┘  └───────┬───────┘
+          │                 │  ▲                 │                  │
+          │                 │  │ GET /products   │                  │
+          │                 │  │         ┌───────┴───────┐          │
+          │                 │  └─────────┤ Order Service │          │
+          │                 │            │  (Port 3004)  │          │
+          │                 │            │ not routed by │          │
+          │                 │            │  the gateway  │          │
+          │                 │            └───────┬───────┘          │
+          └─────────────────┴──────────┬─────────┴──────────────────┘
+                                ┌──────▼──────┐
+                                │  PostgreSQL │
+                                │ (Port 5432) │
+                                └─────────────┘
 
 ┌──────────────────────────────────────────────────┐
 │                 Monitoring Stack                 │
-│   Prometheus (9090) ◄──── Grafana (8080)         │
+│   Prometheus (9090) ◄──── Grafana                │
+│   (Grafana: 3007 locally, 8080 on EKS)           │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -61,12 +65,12 @@ This guide walks through the full deployment of the boutique e-commerce applicat
 | Gateway | 3001 | Routes all client requests to backend services |
 | Auth | 3002 | Login and registration |
 | Product Service | 3003 | Product catalog and inventory |
-| Order Service | 3004 | Cart and checkout |
-| Orders | 3005 | Order history and management |
+| Order Service | 3004 | Minimal demo service — records a product ID as an order. Not routed by the gateway |
+| Orders | 3005 | Creates orders, order history (`/my-orders`), and status updates — handles all `/api/orders` traffic |
 | User Service | 3006 | User profiles and account management |
 | PostgreSQL | 5432 | Stores auth_db, products_db, orders_db, users_db |
 | Prometheus | 9090 | Metrics collection |
-| Grafana | 8080 | Metrics dashboards |
+| Grafana | 3007 (local) / 8080 (EKS) | Metrics dashboards |
 
 ---
 

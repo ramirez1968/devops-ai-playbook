@@ -63,7 +63,7 @@ Now you can scale only the services that need it. A bug in one service doesn't c
 
 **The tradeoff:** Now you have network calls between services instead of in-memory function calls. You have distributed data, more moving parts, and operational complexity.
 
-**In this project:** We have 7 services — gateway, auth, product-service, order-service, orders, user-service, and frontend. Order handling is split in two: `order-service` owns the cart and checkout flow, while `orders` owns order history and management — a small example of splitting by business capability. Each has its own Dockerfile and its own Kubernetes deployment. For data, auth, product-service, and user-service each get their own database (`auth_db`, `products_db`, `users_db`), while `order-service` and `orders` share `orders_db`; the gateway and frontend are stateless. All four databases live on a single PostgreSQL StatefulSet — a pragmatic compromise, since in a strict microservices setup every service would own its data. They communicate through the gateway.
+**In this project:** We have 7 services — gateway, auth, product-service, order-service, orders, user-service, and frontend. `orders` is the real order service — it creates orders, returns a user's order history, and updates order status, and the gateway sends all `/api/orders` traffic to it. `order-service` is a minimal standalone demo (it fetches the product list and records a product ID) that the gateway doesn't route to. Each has its own Dockerfile and its own Kubernetes deployment. For data, auth, product-service, and user-service each get their own database (`auth_db`, `products_db`, `users_db`), while `order-service` and `orders` share `orders_db`; the gateway and frontend are stateless. All four databases live on a single PostgreSQL StatefulSet — a pragmatic compromise, since in a strict microservices setup every service would own its data. They communicate through the gateway.
 
 ---
 
@@ -188,7 +188,7 @@ HPA scales based on CPU and memory. KEDA scales based on external events and met
 
 Example: Your order processing service consumes from a Kafka topic. At peak hours 10,000 messages queue up. KEDA sees the queue depth and scales the consumer pods from 2 to 20 — purely based on queue length, not CPU. When the queue drains, it scales back down.
 
-**In this project:** Current setup uses fixed replica counts. KEDA would be the natural next step — scale the order-service based on incoming order volume, scale the product-service based on request rate measured in Prometheus.
+**In this project:** Current setup uses fixed replica counts. KEDA would be the natural next step — scale the `orders` service based on incoming order volume, scale the product-service based on request rate measured in Prometheus.
 
 ---
 

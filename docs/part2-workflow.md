@@ -41,11 +41,11 @@ flowchart TD
     DC --> PR[Prometheus :9090]
     DC --> GR[Grafana :3007]
 
-    G --> A
-    G --> P
-    G --> OS
-    G --> O
-    G --> U
+    G -->|/api/auth| A
+    G -->|/api/products| P
+    G -->|/api/orders| O
+    G -->|/api/users| U
+    OS -.->|GET /products| P
     A --> DB
     P --> DB
     OS --> DB
