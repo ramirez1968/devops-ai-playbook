@@ -102,7 +102,7 @@ const Home: React.FC = () => {
                     }}
                   >
                     Indulge in our curated collection of luxury products, 
-                    where sophistication meets exceptional quality.
+                    where sophistication meets exceptional quality — now served from AWS EKS.
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                     <Button
