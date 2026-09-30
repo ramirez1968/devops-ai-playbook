@@ -182,6 +182,8 @@ sequenceDiagram
 - If someone manually changes something in the cluster, ArgoCD reverts it to match Git
 - Every deployment is auditable — it's just a Git commit
 
+**Reaching the app:** an Ingress (`gitops/k8s/ingress.yml`) makes the AWS Load Balancer Controller create an ALB: `/api` → gateway, `/` → frontend. The ALB is internet-facing but allow-listed: its security group (`boutique-alb-allowed`, from `projects/Infrastructure/load-balancer.tf`) only admits the addresses in the git-ignored `local.auto.tfvars`. Get the URL with `kubectl get ingress boutique -n boutique`. The nodes themselves sit in private subnets behind a NAT gateway.
+
 **Key files:**
 - `gitops/argo-cd.yml` — registers the repo and branch with ArgoCD, with automated sync (`prune` + `selfHeal`) enabled
 - `gitops/kustomization.yml` — lists all Kubernetes resources to apply
@@ -328,6 +330,8 @@ flowchart TD
 | `projects/Infrastructure/` | Stage 4 | Terraform for AWS |
 | `gitops/argo-cd.yml` | Stage 5 | ArgoCD application definition |
 | `gitops/k8s/` | Stage 5 | All Kubernetes manifests |
+| `gitops/k8s/ingress.yml` | Stage 5 | Public entry point (ALB) |
+| `projects/Infrastructure/load-balancer.tf` | Stage 5 | Load Balancer Controller + ALB allow-list |
 | `gitops/k8s/backend/service-monitor.yml` | Stage 6 | Prometheus scrape config |
 | `gitops/k8s/grafana-dashboard.yml` | Stage 6 | Pre-loaded Grafana dashboard |
 | `projects/Infrastructure/logging.tf` | Stage 6 | Fluent Bit → CloudWatch (log group, IRSA role, Helm chart) |
