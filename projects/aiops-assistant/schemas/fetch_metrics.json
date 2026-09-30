@@ -8,62 +8,43 @@
   "paths": {
     "/fetch_cloudwatch_metrics": {
       "get": {
-        "summary": "Fetch performance metrics from CloudWatch",
-        "description": "Retrieves metric data points from CloudWatch Metrics. Use when checking CPU usage, memory, error rates, latency, database connections, request counts, or any numerical performance data.",
+        "summary": "Fetch Prometheus metrics for Kubernetes pods",
+        "description": "Queries Prometheus for the EKS cluster. Use when checking pod CPU or memory usage, container restarts, or deployment replica availability for the boutique services.",
         "operationId": "fetch_cloudwatch_metrics",
         "parameters": [
           {
             "name": "metric_name",
             "in": "query",
             "required": true,
-            "description": "The CloudWatch metric name. Common metrics: CPUUtilization, MemoryUtilization, DatabaseConnections, FreeStorageSpace, ReadLatency, WriteLatency, 5XXError, 4XXError, RequestCount, TargetResponseTime, HealthyHostCount, UnHealthyHostCount",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pod_cpu_utilization",
+                "pod_memory_utilization",
+                "pod_restarts",
+                "deployment_replicas_unavailable",
+                "deployment_replicas_available"
+              ]
+            },
+            "description": "One of: pod_cpu_utilization (CPU cores used per pod), pod_memory_utilization (bytes per pod), pod_restarts (container restarts in the last hour), deployment_replicas_unavailable, deployment_replicas_available."
           },
           {
             "name": "namespace",
             "in": "query",
-            "required": true,
-            "description": "The AWS service namespace. Use: AWS/ECS for containers, AWS/RDS for databases, AWS/ApplicationELB for load balancers, AWS/EC2 for instances, AWS/Lambda for functions, Custom/Application for app-level metrics",
-            "schema": { "type": "string" }
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Kubernetes namespace. Use boutique for the application services (default)."
           },
           {
             "name": "hours_back",
             "in": "query",
             "required": false,
-            "description": "How many hours of data to retrieve.",
-            "schema": { "type": "string", "default": "1" }
-          },
-          {
-            "name": "period_minutes",
-            "in": "query",
-            "required": false,
-            "description": "Granularity of data points in minutes.",
-            "schema": { "type": "string", "default": "5" }
-          },
-          {
-            "name": "statistic",
-            "in": "query",
-            "required": false,
-            "description": "The statistic to retrieve.",
             "schema": {
-              "type": "string",
-              "default": "Average",
-              "enum": ["Average", "Maximum", "Minimum", "Sum", "SampleCount"]
-            }
-          },
-          {
-            "name": "dimension_name",
-            "in": "query",
-            "required": false,
-            "description": "Dimension name to filter by. Examples: ClusterName, ServiceName, DBInstanceIdentifier, LoadBalancer",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "dimension_value",
-            "in": "query",
-            "required": false,
-            "description": "The value for the dimension filter.",
-            "schema": { "type": "string" }
+              "type": "string"
+            },
+            "description": "Hours of history to return as a time series. Use 1 for recent issues (default), up to 24 for trends."
           }
         ],
         "responses": {
@@ -74,9 +55,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string" },
-                    "summary": { "type": "object" },
-                    "datapoints": { "type": "array" }
+                    "status": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "object"
+                    },
+                    "datapoints": {
+                      "type": "array"
+                    }
                   }
                 }
               }

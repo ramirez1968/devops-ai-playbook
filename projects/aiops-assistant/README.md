@@ -1,6 +1,8 @@
 # AIOps Assistant — Kira
 
-An AI-powered SRE assistant built on AWS Bedrock Agent. Kira diagnoses production incidents by querying CloudWatch Logs, CloudWatch Metrics (via Prometheus), and EKS cluster health — then responds with root cause, evidence, and fix recommendations.
+An AI-powered SRE assistant on Amazon Bedrock. Kira diagnoses production incidents by querying CloudWatch Logs, Prometheus metrics, and EKS cluster health — then responds with root cause, evidence, and fix recommendations.
+
+> **Why not a Bedrock Agent?** Kira was first built as a Bedrock Agent (`deploy.sh`). Bedrock Agents is now in maintenance mode and no longer accepts new agents, so the agent loop runs in `kira_agent.py` on the Bedrock **Converse API** instead. Same model, same prompt, same Lambda tools.
 
 ---
 
@@ -10,101 +12,48 @@ An AI-powered SRE assistant built on AWS Bedrock Agent. Kira diagnoses productio
 Streamlit UI (app.py)
       │
       ▼
-Bedrock Agent (Kira)
+kira_agent.py ── Converse API ──► Qwen 3 32B (Amazon Bedrock)
+      │   the model asks for a tool → we invoke the Lambda → send the result back
       │
-      ├── fetch_logs         → CloudWatch Logs
-      ├── fetch_metrics      → Prometheus (ELB endpoint)
-      └── fetch_service_health → EKS cluster + node groups
+      ├── aiops-fetch-logs     → CloudWatch Logs (/eks/boutique/pods)
+      ├── aiops-fetch-metrics  → Prometheus  ┐ via the EKS API service proxy,
+      └── aiops-fetch-health   → EKS + Prometheus ┘ IAM-signed (Prometheus stays private)
 ```
+
+The tool definitions the model sees are built from `schemas/*.json`, and the Lambdas receive the same event format a Bedrock Agent would send.
 
 ---
 
 ## Prerequisites
 
-- AWS account with access to Bedrock (model access enabled for your chosen model)
-- EKS cluster running with Prometheus exposed via a LoadBalancer service
-- AWS CLI configured (`aws configure`)
+- The EKS stack from `projects/Infrastructure` applied (it creates the Lambdas too — see below)
+- Bedrock model access for `qwen.qwen3-32b-v1:0` in your region
+- AWS CLI configured (`aws configure`) with permission to call `bedrock:InvokeModel` and `lambda:InvokeFunction`
 - Python 3.10+
 
 ---
 
-## Step 1: Set Up IAM Roles
+## Step 1: Deploy the Tools (Terraform)
 
-Run the provided script to create both required IAM roles:
+The tools are part of the infrastructure code in `projects/Infrastructure/kira.tf`:
 
-```bash
-chmod +x setup-iam.sh
-./setup-iam.sh
-```
-
-This creates:
-
-| Role | Used By | Permissions |
-|------|---------|-------------|
-| `aiops-lambda-role` | All 3 Lambda functions | CloudWatch Logs read, EKS describe, Lambda basic execution |
-| `aiops-bedrock-agent-role` | Bedrock Agent | Invoke the 3 Lambda functions, invoke Bedrock models |
-
----
-
-## Step 2: Create the Lambda Functions
-
-Create the following 3 Lambda functions in the AWS Console (or via CLI). Use the code from the `lambda/` directory.
-
-| Function Name | Code File | Execution Role |
-|---------------|-----------|----------------|
-| `aiops-fetch-logs` | `lambda/fetch_logs/lambda_function.py` | `aiops-lambda-role` |
-| `aiops-fetch-metrics` | `lambda/fetch_metrics/lambda_function.py` | `aiops-lambda-role` |
-| `aiops-fetch-health` | `lambda/fetch_health/lambda_function.py` | `aiops-lambda-role` |
-
-Runtime: **Python 3.12** | Timeout: **30 seconds**
-
----
-
-## Step 3: Update the Prometheus URL
-
-Both `fetch_metrics` and `fetch_health` lambdas query Prometheus directly. Update the `PROMETHEUS_URL` placeholder in each file before uploading the code.
-
-In `lambda/fetch_metrics/lambda_function.py`:
-```python
-PROMETHEUS_URL = "http://<YOUR_PROMETHEUS_ELB_URL>:9090"
-```
-
-In `lambda/fetch_health/lambda_function.py`:
-```python
-PROMETHEUS_URL = "http://<YOUR_PROMETHEUS_ELB_URL>:9090"
-```
-
-To get the Prometheus ELB URL, expose Prometheus as a LoadBalancer service:
+| Resource | Purpose |
+|----------|---------|
+| `aiops-lambda-role` | Lambda basics, read CloudWatch Logs, describe this EKS cluster |
+| EKS access entry + Role `kira-prometheus-proxy` | The Lambda role may only `get` the Prometheus service proxy — nothing else in the cluster |
+| `aiops-fetch-logs`, `aiops-fetch-metrics`, `aiops-fetch-health` | The 3 tools (Python 3.12, 30s timeout) |
 
 ```bash
-kubectl patch svc kube-prometheus-stack-prometheus -n monitoring \
-  -p '{"spec": {"type": "LoadBalancer"}}'
-
-kubectl get svc kube-prometheus-stack-prometheus -n monitoring
-# Copy the EXTERNAL-IP value — that is your ELB URL
+cd ../Infrastructure
+terraform plan    # review
+terraform apply
 ```
+
+`fetch_metrics` and `fetch_health` share `lambda/common/eks_prometheus.py`, which calls Prometheus through the EKS API with the same IAM-signed token `aws eks get-token` produces. No LoadBalancer or public Prometheus is needed.
 
 ---
 
-## Step 4: Deploy the Bedrock Agent
-
-Run the deploy script. It will:
-- Verify the Lambda functions and IAM role exist
-- Set Lambda timeouts to 30s and add Bedrock invoke permissions
-- Create the Bedrock Agent (`aiops-assistant`) with the Kira system prompt
-- Attach all 3 action groups with their OpenAPI schemas
-- Prepare the agent
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-At the end, the script prints your **Agent ID** — keep it for the next step.
-
----
-
-## Step 5: (Optional) Generate Sample Data
+## Step 2: (Optional) Generate Sample Data
 
 Populate CloudWatch Logs with realistic error scenarios to test Kira:
 
@@ -116,33 +65,31 @@ This writes 100 realistic log events (503 errors, OOM kills, connection pool exh
 
 ---
 
-## Step 6: Run the Streamlit UI
+## Step 3: Run the Streamlit UI
 
 ```bash
-cp .env.example .env
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/streamlit run app.py
 ```
 
-Edit `.env` and fill in your values:
+Open **http://localhost:8501**. Each answer has a **🔧 Tools used** section showing which tools Kira called and with what inputs.
+
+Optional `.env` (copy `.env.example`):
 
 ```env
 AWS_REGION=us-east-1
-BEDROCK_AGENT_ID=<YOUR_AGENT_ID>
-BEDROCK_AGENT_ALIAS_ID=TSTALIASID
-
-# Optional — omit to use your AWS CLI profile / SSO / IAM role:
-# AWS_ACCESS_KEY_ID=<YOUR_ACCESS_KEY>
-# AWS_SECRET_ACCESS_KEY=<YOUR_SECRET_KEY>
-# AWS_SESSION_TOKEN=<YOUR_SESSION_TOKEN>
+# KIRA_MODEL_ID=qwen.qwen3-32b-v1:0
+# Omit these to use your AWS CLI profile / SSO / IAM role:
+# AWS_ACCESS_KEY_ID=...
+# AWS_SECRET_ACCESS_KEY=...
 ```
 
-Install dependencies and start the UI:
+You can also ask from a terminal:
 
 ```bash
-pip install -r requirements.txt
-streamlit run app.py
+.venv/bin/python -c "from kira_agent import Kira; print(Kira().ask('Are all pods healthy?')[0])"
 ```
-
-Open **http://localhost:8501** in your browser.
 
 ---
 
@@ -151,20 +98,19 @@ Open **http://localhost:8501** in your browser.
 ```
 aiops-assistant/
 ├── app.py                  # Streamlit chat UI
-├── deploy.sh               # Bedrock Agent deployment script
-├── setup-iam.sh            # IAM roles and policies setup
+├── kira_agent.py           # Agent loop: Converse API + tool calls to the Lambdas
 ├── requirements.txt        # Python dependencies
 ├── .env.example            # Environment variable template
 ├── lambda/
+│   ├── common/             # eks_prometheus.py — Prometheus via the EKS API
 │   ├── fetch_logs/         # CloudWatch Logs query
 │   ├── fetch_metrics/      # Prometheus metrics query
 │   └── fetch_health/       # EKS cluster health check
-├── schemas/
-│   ├── fetch_logs.json     # OpenAPI schema for fetch_logs
-│   ├── fetch_metrics.json  # OpenAPI schema for fetch_metrics
-│   └── fetch_health.json   # OpenAPI schema for fetch_health
-└── scripts/
-    └── generate_sample_data.py  # Seed CloudWatch with test errors
+├── schemas/                # OpenAPI schemas → the tool definitions Kira sees
+├── scripts/
+│   └── generate_sample_data.py  # Seed CloudWatch with test errors
+└── deploy.sh, setup-iam.sh, aiops_all_lambda_code.py
+                            # Legacy Bedrock Agent setup (no longer works; kept for reference)
 ```
 
 ---
@@ -173,54 +119,32 @@ aiops-assistant/
 
 - Why are we seeing 503 errors in the last hour?
 - Is CPU usage high across the boutique services?
-- Check database connections and latency
 - Are all pods healthy? Any restarts?
 - What are the most frequent errors in the last 2 hours?
+
+**Verify what Kira tells you.** It cites real log lines and metric values, but it can still connect them wrongly — for example, attributing old restarts from a replaced pod to the pod running now. Treat the answer as a starting point for your own check.
 
 ---
 
 ## Potential Issues
 
-### Bedrock model access not enabled
-The deploy script will fail at agent creation if model access hasn't been requested. Go to **AWS Console → Bedrock → Model access** and enable access for the model used in `deploy.sh` before running the script.
+### `AccessDeniedException` calling the model
+Model access for `qwen.qwen3-32b-v1:0` isn't enabled in your account/region. Check **AWS Console → Bedrock → Model access**.
 
-### Prometheus URL unreachable from Lambda
-`fetch_metrics` and `fetch_health` make outbound HTTP calls to the Prometheus ELB. If Lambda is deployed inside a VPC without a NAT gateway or internet gateway route, these calls will time out. Either:
-- Keep Lambda outside a VPC (default), or
-- Ensure the VPC has a route to the internet and the Prometheus ELB security group allows inbound on port 9090.
-
-### Agent stuck in PREPARING state
-After running `deploy.sh`, the agent status shows `PREPARING`. This is normal and takes 30–60 seconds. If it stays in this state, check the Bedrock console for validation errors — usually caused by a malformed OpenAPI schema or a Lambda ARN that doesn't exist.
-
-### Streamlit shows "NOT CONFIGURED"
-The app requires `BEDROCK_AGENT_ID` and `BEDROCK_AGENT_ALIAS_ID` to be set in `.env`. If you started Streamlit before populating `.env`, stop it and restart — `load_dotenv()` only reads the file at startup.
+### `fetch_metrics` / `fetch_health` return `Forbidden`
+The Lambda role's access entry or the `kira-prometheus-proxy` Role is missing. Re-run `terraform apply` in `projects/Infrastructure` and check:
 
 ```bash
-# Stop and restart
-pkill -f "streamlit run app.py"
-streamlit run app.py
+aws eks list-access-entries --cluster-name eks-cluster
+kubectl get role,rolebinding kira-prometheus-proxy -n monitoring
 ```
 
-### fetch_logs returns no results
-The default log group is `/eks/boutique/pods`. This group is only created after Fluent Bit starts shipping logs. Make sure `aws-for-fluent-bit` is running:
+### `fetch_logs` returns no results
+Logs arrive in `/eks/boutique/pods` via Fluent Bit (`projects/Infrastructure/logging.tf`), which only ships new lines. Make sure it's running:
 
 ```bash
 kubectl get pods -n amazon-cloudwatch
 ```
 
-If the log group doesn't exist yet, run the sample data generator first (Step 5) which creates `/app/production`.
-
-### fetch_health uses wrong cluster name
-The Lambda defaults to cluster name `eks-cluster`. If your cluster has a different name, update `DEFAULT_CLUSTER` in `lambda/fetch_health/lambda_function.py` before uploading the function code.
-
-### Lambda execution role missing permissions
-If `fetch_health` returns an access denied error on `eks:DescribeCluster`, the inline policy may not have propagated yet (IAM can take ~10–15 seconds). Wait and retry. If it persists, verify the inline policy is attached:
-
-```bash
-aws iam get-role-policy \
-  --role-name aiops-lambda-role \
-  --policy-name aiops-lambda-inline-policy
-```
-
 ### AWS credentials not resolving in Streamlit
-If `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are left blank in `.env`, boto3 falls back to the default credential chain (`~/.aws/credentials`, environment variables, IAM role). If none of those are configured, Bedrock calls will fail with an auth error. Either fill in the credentials in `.env` or ensure your terminal session has valid AWS credentials before starting Streamlit.
+If `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are blank in `.env`, boto3 uses the default credential chain (`~/.aws/credentials`, environment variables, IAM role). Make sure your terminal has valid AWS credentials before starting Streamlit.

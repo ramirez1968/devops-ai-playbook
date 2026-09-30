@@ -33,6 +33,15 @@ resource "aws_eks_cluster" "eks" {
     endpoint_private_access = false
   }
 
+  # Access entries (API) alongside the legacy aws-auth ConfigMap.
+  # One-way: EKS can't switch back to CONFIG_MAP.
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+    # Must match the value the cluster was created with; changing it
+    # forces cluster replacement.
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.cluster_policy
   ]

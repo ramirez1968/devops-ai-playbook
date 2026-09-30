@@ -34,6 +34,12 @@
 
 - **Solution**: Set the cluster to `1.35` in `modules/eks/main.tf` and made the node group follow it (`version = aws_eks_cluster.eks.version`), which rolled both nodes to 1.35. Lesson: once Terraform owns the infrastructure, make changes in code, not the console.
 
+### 5. Enabling EKS Access Entries Planned a Cluster Replacement
+
+- **Problem**: Adding `access_config { authentication_mode = "API_AND_CONFIG_MAP" }` made `terraform plan` want to **destroy and recreate** the EKS cluster.
+- **Root Cause**: The block left `bootstrap_cluster_creator_admin_permissions` unset (`null`), while the live cluster had `true`, and that attribute forces replacement.
+- **Solution**: Set `bootstrap_cluster_creator_admin_permissions = true` explicitly. The plan became an in-place update; EKS created access entries for the existing identities (the creator, node role) automatically. Always read the plan for `must be replaced` before applying.
+
 ---
 
 ## Database Issue
@@ -67,6 +73,27 @@
 - **Problem**: On EKS, Prometheus had 1 boutique target (gateway). Auth, product-service, order-service, orders, and user-service metrics were missing.
 - **Root Cause**: The ServiceMonitor selected only `app: gateway` on a port named `http`. Only the gateway Service had that label and port name; the other five had no labels and unnamed ports.
 - **Solution**: Added `app: <name>` and a port named `http` to the five backend Services, and changed the ServiceMonitor to select all six backend services by `app`.
+
+
+---
+
+## AIOps (Kira)
+
+### 1. Bedrock Agents No Longer Accepts New Agents
+
+- **Problem**: Creating Kira's agent failed with `AccessDeniedException: Bedrock Agents is in Maintenance Mode. New agent creation is not available`.
+- **Root Cause**: AWS put Bedrock Agents in maintenance mode after `deploy.sh` was written.
+- **Solution**: Run the agent loop in `kira_agent.py` on the Bedrock Converse API with tool use (same Qwen 3 32B model, prompt, and Lambdas). The tool definitions are generated from `schemas/*.json`, and the Lambdas receive the same event format a Bedrock Agent would send.
+
+### 2. Metrics Tool Schema Described CloudWatch, Lambda Queried Prometheus
+
+- **Problem**: The `fetch_metrics` OpenAPI schema told the model to send CloudWatch names (`CPUUtilization`, namespace `AWS/ECS`), but the Lambda runs Prometheus queries with names like `pod_cpu_utilization` and a Kubernetes namespace, so every call would return no data.
+- **Solution**: Rewrote the schema to the five metric names the Lambda supports (as an `enum`) and the Kubernetes namespace.
+
+### 3. Prometheus Exposed Publicly for the Lambdas
+
+- **Problem**: The original setup made Prometheus a public LoadBalancer so Lambdas could query it. Prometheus has no authentication.
+- **Solution**: Lambdas call Prometheus through the EKS API service proxy with IAM-signed tokens (`lambda/common/eks_prometheus.py`). The Lambda role has an EKS access entry mapped to a Role that may only `get` the Prometheus `services/proxy`.
 
 ---
 

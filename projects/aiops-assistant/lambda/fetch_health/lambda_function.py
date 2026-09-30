@@ -1,20 +1,12 @@
 import boto3
 import json
-import urllib.request
-import urllib.parse
 from datetime import datetime, timedelta
+
+from eks_prometheus import prometheus_query
 
 DEFAULT_CLUSTER = "eks-cluster"
 DEFAULT_NAMESPACE = "boutique"
 REGION = "us-east-1"
-PROMETHEUS_URL = "http://<YOUR_PROMETHEUS_ELB_URL>:9090"
-
-def prometheus_query(query):
-    """Run an instant PromQL query and return the result."""
-    url = f"{PROMETHEUS_URL}/api/v1/query?query={urllib.parse.quote(query)}"
-    with urllib.request.urlopen(url, timeout=10) as resp:
-        return json.loads(resp.read())["data"]["result"]
-
 
 def check_eks_health(cluster_name, k8s_namespace):
     eks = boto3.client("eks", region_name=REGION)

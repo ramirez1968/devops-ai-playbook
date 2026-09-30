@@ -1,9 +1,6 @@
 import json
-import urllib.request
-import urllib.parse
-from datetime import datetime
 
-PROMETHEUS_URL = "http://<YOUR_PROMETHEUS_ELB_URL>:9090"
+from eks_prometheus import prometheus_query, prometheus_range_query
 
 DEFAULT_NAMESPACE = "boutique"
 
@@ -14,26 +11,6 @@ METRIC_QUERIES = {
     "deployment_replicas_unavailable": 'kube_deployment_status_replicas_unavailable{{namespace="{namespace}"}}',
     "deployment_replicas_available": 'kube_deployment_status_replicas_available{{namespace="{namespace}"}}',
 }
-
-
-def prometheus_query(query):
-    """Run an instant PromQL query."""
-    url = f"{PROMETHEUS_URL}/api/v1/query?query={urllib.parse.quote(query)}"
-    with urllib.request.urlopen(url, timeout=10) as resp:
-        return json.loads(resp.read())["data"]["result"]
-
-
-def prometheus_range_query(query, hours_back, step="5m"):
-    """Run a range PromQL query and return time-series data."""
-    end = int(datetime.utcnow().timestamp())
-    start = end - (hours_back * 3600)
-    url = (
-        f"{PROMETHEUS_URL}/api/v1/query_range"
-        f"?query={urllib.parse.quote(query)}"
-        f"&start={start}&end={end}&step={step}"
-    )
-    with urllib.request.urlopen(url, timeout=10) as resp:
-        return json.loads(resp.read())["data"]["result"]
 
 
 def lambda_handler(event, context):

@@ -41,7 +41,7 @@ DevOps-Practice-Guide/
 │   ├── README.md                  # EKS deployment guide (Part 3)
 │   ├── boutique-microservices/    # The application (7 services)
 │   ├── Infrastructure/            # Terraform for AWS provisioning
-│   └── aiops-assistant/           # Bedrock Agent — Kira (Part 4)
+│   └── aiops-assistant/           # Kira — AIOps agent on Amazon Bedrock (Part 4)
 ├── gitops/
 │   ├── argo-cd.yml                # ArgoCD Application manifest
 │   ├── kustomization.yml          # Kustomize entry point
@@ -158,5 +158,5 @@ Once you implement the project:
 | GitOps | ArgoCD + Kustomize |
 | Monitoring | Prometheus + Grafana |
 | Log Forwarding | AWS Fluent Bit → CloudWatch |
-| AIOps | AWS Bedrock Agent (Kira) |
+| AIOps | Amazon Bedrock Converse API + Lambda tools (Kira) |
 | AI Assistant | Claude Code + MCP Servers |

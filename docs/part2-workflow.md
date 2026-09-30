@@ -238,18 +238,18 @@ flowchart LR
 
 ---
 
-## Stage 7: AIOps — Kira (Bedrock Agent)
+## Stage 7: AIOps — Kira (Amazon Bedrock)
 
 This is where the workflow goes beyond traditional DevOps. When something goes wrong in production, instead of manually digging through logs and metrics, you ask Kira.
 
 ```mermaid
 flowchart TD
     Incident[Incident detected\nor engineer asks a question] --> UI[Streamlit UI\napp.py]
-    UI --> Agent[Bedrock Agent\nKira]
+    UI --> Agent[Kira agent loop\nkira_agent.py + Bedrock Converse\nQwen 3 32B]
 
     Agent --> |Hypothesis: check logs| FL[Lambda: fetch_logs\nCloudWatch Logs]
-    Agent --> |Hypothesis: check metrics| FM[Lambda: fetch_metrics\nPrometheus API]
-    Agent --> |Hypothesis: check health| FH[Lambda: fetch_health\nEKS + Node Groups]
+    Agent --> |Hypothesis: check metrics| FM[Lambda: fetch_metrics\nPrometheus via EKS API]
+    Agent --> |Hypothesis: check health| FH[Lambda: fetch_health\nEKS + Prometheus]
 
     FL --> |Log entries + timestamps| Agent
     FM --> |CPU, memory, latency, errors| Agent
@@ -264,7 +264,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant Eng as Engineer
-    participant Kira as Kira (Bedrock Agent)
+    participant Kira as Kira (Converse loop)
     participant Logs as fetch_logs (Lambda)
     participant Metrics as fetch_metrics (Lambda)
     participant Health as fetch_health (Lambda)
@@ -307,7 +307,7 @@ flowchart TD
     EKS -->|pod logs| FB[Fluent Bit]
     Prom --> Grafana[Grafana\nDashboards]
     FB --> CW[CloudWatch\nLog Groups]
-    Grafana -->|anomaly detected| Kira[Kira — AIOps Agent\nBedrock + Lambda]
+    Grafana -->|anomaly detected| Kira[Kira — AIOps Agent\nBedrock Converse + Lambda]
     CW --> Kira
     Kira -->|root cause + fix| Eng[👩‍💻 Engineer]
 
@@ -331,4 +331,5 @@ flowchart TD
 | `gitops/k8s/backend/service-monitor.yml` | Stage 6 | Prometheus scrape config |
 | `gitops/k8s/grafana-dashboard.yml` | Stage 6 | Pre-loaded Grafana dashboard |
 | `projects/Infrastructure/logging.tf` | Stage 6 | Fluent Bit → CloudWatch (log group, IRSA role, Helm chart) |
-| `projects/aiops-assistant/` | Stage 7 | Kira — AIOps Bedrock Agent |
+| `projects/aiops-assistant/` | Stage 7 | Kira — agent loop, UI, Lambda tool code |
+| `projects/Infrastructure/kira.tf` | Stage 7 | Kira's Lambdas, IAM role, and cluster access |
