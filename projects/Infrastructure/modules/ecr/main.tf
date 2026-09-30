@@ -5,8 +5,8 @@ variable "repositories" {
 resource "aws_ecr_repository" "repos" {
   for_each = toset(var.repositories)
 
-  name = each.value
-  force_delete = true  # To delete the images inside the repo
+  name         = each.value
+  force_delete = true # To delete the images inside the repo
 
   image_scanning_configuration {
     scan_on_push = true

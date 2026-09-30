@@ -13,10 +13,10 @@ resource "kubernetes_namespace_v1" "monitoring" {
 terraform {
   required_providers {
     kubernetes = {
-      source  = "hashicorp/kubernetes"
+      source = "hashicorp/kubernetes"
     }
     helm = {
-      source  = "hashicorp/helm"
+      source = "hashicorp/helm"
     }
   }
 }
@@ -35,7 +35,7 @@ resource "helm_release" "argocd" {
     yamlencode({
       server = {
         service = {
-          type = "ClusterIP" 
+          type = "ClusterIP"
         }
       }
       configs = {
@@ -48,8 +48,8 @@ resource "helm_release" "argocd" {
 }
 
 resource "helm_release" "monitoring" {
-  name       = "kube-prometheus-stack"
-  namespace  = kubernetes_namespace_v1.monitoring.metadata[0].name
+  name      = "kube-prometheus-stack"
+  namespace = kubernetes_namespace_v1.monitoring.metadata[0].name
 
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"

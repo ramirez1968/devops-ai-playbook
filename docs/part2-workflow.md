@@ -92,6 +92,8 @@ Everything is tracked — who changed what, when, and why. This is the foundatio
 
 ## Stage 3: CI Pipeline — GitHub Actions
 
+> **First-time setup:** run [Stage 4 (Terraform)](#stage-4-infrastructure--terraform-on-aws) before this stage — CI pushes images to ECR repositories that Terraform creates. The stages are numbered in the order code flows day to day, not the order you build them the first time.
+
 When you run the pipeline, GitHub Actions builds Docker images for all 7 services in parallel and pushes them to Amazon ECR.
 
 The pipeline uses a **manual trigger** (`workflow_dispatch`) rather than running on every push — so documentation commits and work-in-progress don't burn build minutes or roll out a deployment. To switch to fully automatic CI, change `on: workflow_dispatch` to `on: push: branches: [main]` in `ci.yml`.
