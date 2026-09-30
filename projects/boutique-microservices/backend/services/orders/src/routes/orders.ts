@@ -1,15 +1,25 @@
 import express from 'express';
 import axios from 'axios';
 import { query } from '../database/connection';
+import { requireUser, requireAdmin } from '../auth';
 import { Order, CreateOrderRequest, Address, ServiceResponse } from '../types';
 
 const router = express.Router();
 const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003';
+const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 
-router.post('/', async (req, res) => {
+router.post('/', requireUser, async (req, res) => {
   try {
-    // Demo mode - use a fixed user ID or get from request
-    const { items, shippingAddress, userId = 'demo-user-id' } = req.body as CreateOrderRequest & { userId?: string };
+    // The user comes from the verified token, never from the request body.
+    const userId = res.locals.user.userId;
+    const { items, shippingAddress } = req.body as CreateOrderRequest;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'Order must contain at least one item' });
+    }
+    if (!items.every(i => Number.isInteger(i.quantity) && i.quantity > 0 && i.quantity <= 100)) {
+      return res.status(400).json({ success: false, error: 'Each quantity must be a whole number from 1 to 100' });
+    }
 
     let totalAmount = 0;
     const orderItems: any[] = [];
@@ -73,10 +83,9 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/my-orders', async (req, res) => {
+router.get('/my-orders', requireUser, async (req, res) => {
   try {
-    // Demo mode - use a fixed user ID or get from query
-    const userId = req.query.userId as string || 'demo-user-id';
+    const userId = res.locals.user.userId;
 
     const result = await query(`
       SELECT o.*,
@@ -107,10 +116,14 @@ router.get('/my-orders', async (req, res) => {
   }
 });
 
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', requireUser, requireAdmin, async (req, res) => {
   try {
     const { status } = req.body;
     const { id } = req.params;
+
+    if (!ORDER_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, error: `Status must be one of: ${ORDER_STATUSES.join(', ')}` });
+    }
 
     await query('UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [status, id]);
 

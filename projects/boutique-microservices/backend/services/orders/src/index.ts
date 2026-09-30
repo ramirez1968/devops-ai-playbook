@@ -5,8 +5,10 @@ import * as dotenv from 'dotenv';
 import { orderRoutes } from './routes/orders';
 import { connectDB } from './database/connection';
 import { metricsMiddleware, setupMetrics } from './metrics';
+import { jwtSecret } from './auth';
 
 dotenv.config({ path: './.env' });
+jwtSecret(); // fail fast if JWT_SECRET is missing or too short
 
 const app = express();
 const PORT = process.env.PORT || 3005;

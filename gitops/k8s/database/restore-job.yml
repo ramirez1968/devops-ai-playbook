@@ -34,7 +34,27 @@ spec:
                 role VARCHAR(50) DEFAULT 'customer',
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
-              );"
+              );
+              CREATE TABLE IF NOT EXISTS addresses (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  street VARCHAR(255),
+                  city VARCHAR(100),
+                  state VARCHAR(100),
+                  zip_code VARCHAR(20),
+                  country VARCHAR(100),
+                  is_default BOOLEAN DEFAULT FALSE,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              );
+
+              CREATE TABLE IF NOT EXISTS user_preferences (
+                  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                  currency VARCHAR(3) DEFAULT 'USD',
+                  language VARCHAR(10) DEFAULT 'en',
+                  newsletter BOOLEAN DEFAULT TRUE,
+                  promotions BOOLEAN DEFAULT TRUE,
+                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              )"
 
               echo "Creating orders_db schema..."
               psql -h boutique-postgres -U postgres -d orders_db -c "

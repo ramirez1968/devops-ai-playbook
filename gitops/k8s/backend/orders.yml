@@ -44,6 +44,11 @@ spec:
                 secretKeyRef:
                   name: boutique-secrets
                   key: ORDERS_DB_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: boutique-jwt
+                  key: JWT_SECRET
             - name: PRODUCTS_SERVICE_URL
               value: "http://product-service:3003"
 

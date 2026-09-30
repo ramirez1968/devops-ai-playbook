@@ -25,6 +25,28 @@ INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES
 
 -- ============================================================
 -- PRODUCTS DB
+-- Profile data used by user-service (it shares auth_db's users table)
+CREATE TABLE IF NOT EXISTS addresses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    street VARCHAR(255),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    zip_code VARCHAR(20),
+    country VARCHAR(100),
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    currency VARCHAR(3) DEFAULT 'USD',
+    language VARCHAR(10) DEFAULT 'en',
+    newsletter BOOLEAN DEFAULT TRUE,
+    promotions BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================================
 \c products_db
 

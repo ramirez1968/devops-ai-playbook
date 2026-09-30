@@ -1,16 +1,31 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../database/connection';
-import { User } from '../types';
+import { issueTokens, verifyToken, bearerToken } from '../jwt';
 
 const router = express.Router();
 
-// Simple demo authentication without JWT
-let currentUser: any = null;
+const USER_COLUMNS = 'id, email, first_name, last_name, role, created_at, updated_at';
+
+function toUser(row: any) {
+  return {
+    id: row.id,
+    email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    role: row.role,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 router.post('/register', async (req, res) => {
   try {
     const { email, password, firstName, lastName } = req.body;
+
+    if (!email || !password || password.length < 8) {
+      return res.status(400).json({ error: 'Email and a password of at least 8 characters are required' });
+    }
 
     const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
@@ -19,33 +34,12 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await query(
-      'INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, role, created_at, updated_at',
+      `INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING ${USER_COLUMNS}`,
       [email, hashedPassword, firstName, lastName, 'customer']
     );
 
     const user = result.rows[0];
-    currentUser = {
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.role
-    };
-
-    res.status(201).json({
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        role: user.role,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
-      },
-      token: user.id.toString(),
-      refreshToken: user.id.toString(),
-      message: 'Registration successful'
-    });
+    res.status(201).json({ user: toUser(user), ...issueTokens(user), message: 'Registration successful' });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Registration failed' });
@@ -55,120 +49,62 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // For demo mode: accept any email with password "demo"
-    if (password === 'demo') {
-      let user;
-      const result = await query('SELECT id, email, first_name, last_name, role, created_at, updated_at FROM users WHERE email = $1', [email]);
-      
-      if (result.rows.length === 0) {
-        // Create demo user if doesn't exist
-        const hashedPassword = await bcrypt.hash('demo', 10);
-        const newUser = await query(
-          'INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, role, created_at, updated_at',
-          [email, hashedPassword, 'Demo', 'User', 'customer']
-        );
-        user = newUser.rows[0];
-      } else {
-        user = result.rows[0];
-      }
-
-      currentUser = {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        role: user.role
-      };
-
-      res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          role: user.role,
-          createdAt: user.created_at,
-          updatedAt: user.updated_at
-        },
-        token: user.id.toString(),
-        refreshToken: user.id.toString(),
-        message: 'Demo login successful'
-      });
-      return;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Normal password check
-    const result = await query('SELECT id, email, password_hash, first_name, last_name, role, created_at, updated_at FROM users WHERE email = $1', [email]);
-    
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
+    const result = await query(`SELECT password_hash, ${USER_COLUMNS} FROM users WHERE email = $1`, [email]);
     const user = result.rows[0];
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
-    if (!isValidPassword) {
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    currentUser = {
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.role
-    };
-
-    res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        role: user.role,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
-      },
-      token: user.id.toString(),
-      refreshToken: user.id.toString(),
-      message: 'Login successful'
-    });
+    res.json({ user: toUser(user), ...issueTokens(user), message: 'Login successful' });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
+// Exchange a refresh token for a new access token (called by the frontend on 401).
+router.post('/refresh', async (req, res) => {
+  const claims = verifyToken(req.body?.refreshToken, 'refresh');
+  if (!claims) {
+    return res.status(401).json({ error: 'Invalid refresh token' });
+  }
+
+  try {
+    const result = await query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [claims.userId]);
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    const { token } = issueTokens(result.rows[0]);
+    res.json({ token });
+  } catch (error) {
+    console.error('Refresh error:', error);
+    res.status(500).json({ error: 'Refresh failed' });
+  }
+});
+
+// Tokens are stateless; the client discards them.
 router.post('/logout', (req, res) => {
-  currentUser = null;
   res.json({ message: 'Logged out successfully' });
 });
 
 router.get('/me', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const userId = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!userId || userId === 'undefined') {
+  const claims = verifyToken(bearerToken(req.headers.authorization), 'access');
+  if (!claims) {
     return res.status(401).json({ error: 'Not logged in' });
   }
 
   try {
-    const result = await query(
-      'SELECT id, email, first_name, last_name, role FROM users WHERE id = $1',
-      [userId]
-    );
+    const result = await query('SELECT id, email, first_name, last_name, role FROM users WHERE id = $1', [claims.userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'User not found' });
     }
-    const user = result.rows[0];
-    res.json({
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.role
-    });
+    const { createdAt, updatedAt, ...user } = toUser(result.rows[0]);
+    res.json(user);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user' });
   }

@@ -43,7 +43,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: boutique-secrets
-                  key: USERS_DB_URL
+                  key: AUTH_DB_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: boutique-jwt
+                  key: JWT_SECRET
 
 --- 
 

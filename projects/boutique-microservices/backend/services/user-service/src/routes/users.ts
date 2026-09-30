@@ -1,22 +1,14 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { query } from '../database/connection';
+import { requireUser } from '../auth';
 import { UserProfile, Address, ServiceResponse } from '../types';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret';
 
-router.get('/profile', async (req, res) => {
+router.get('/profile', requireUser, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = res.locals.user;
     
     const result = await query('SELECT id, email, first_name, last_name, role, created_at, updated_at FROM users WHERE id = $1', [decoded.userId]);
     
@@ -56,15 +48,9 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-router.put('/profile', async (req, res) => {
+router.put('/profile', requireUser, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = res.locals.user;
     const { firstName, lastName } = req.body;
 
     await query(
@@ -102,15 +88,9 @@ router.put('/profile', async (req, res) => {
   }
 });
 
-router.post('/addresses', async (req, res) => {
+router.post('/addresses', requireUser, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = res.locals.user;
     const { street, city, state, zipCode, country, isDefault } = req.body;
 
     const result = await query(

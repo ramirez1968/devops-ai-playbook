@@ -9,7 +9,11 @@
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["auth", "microservice", "boutique"],
+  "keywords": [
+    "auth",
+    "microservice",
+    "boutique"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -19,7 +23,8 @@
     "helmet": "^7.1.0",
     "dotenv": "^16.3.1",
     "pg": "^8.11.3",
-    "prom-client": "^15.1.0"
+    "prom-client": "^15.1.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -28,6 +33,7 @@
     "@types/pg": "^8.10.9",
     "typescript": "^5.2.2",
     "nodemon": "^3.0.2",
-    "ts-node": "^10.9.1"
+    "ts-node": "^10.9.1",
+    "@types/jsonwebtoken": "^9.0.5"
   }
 }

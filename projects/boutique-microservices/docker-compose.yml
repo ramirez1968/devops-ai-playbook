@@ -95,6 +95,7 @@ services:
       - NODE_ENV=development
       - PORT=3002
       - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/auth_db
+      - JWT_SECRET=local-dev-only-jwt-secret-do-not-use-in-prod-0123456789
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,6 +159,7 @@ services:
       - NODE_ENV=development
       - PORT=3005
       - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/orders_db
+      - JWT_SECRET=local-dev-only-jwt-secret-do-not-use-in-prod-0123456789
       - PRODUCTS_SERVICE_URL=http://product-service:3003
     depends_on:
       postgres:
@@ -177,7 +179,9 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3006
-      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/users_db
+      # user-service shares auth's users table (one list of users)
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/auth_db
+      - JWT_SECRET=local-dev-only-jwt-secret-do-not-use-in-prod-0123456789
     depends_on:
       postgres:
         condition: service_healthy
