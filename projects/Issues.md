@@ -18,6 +18,14 @@
 
 - **Solution**: Configured IRSA policy for the EBS CSI driver.
 
+### 3. Terraform Apply Fails With `Unauthorized` on Kubernetes Resources
+
+- **Problem**: `terraform apply` created the VPC, EKS cluster, node group, and EBS add-on (28/32), then failed on the `argocd` and `monitoring` namespaces with `Error: Unauthorized`.
+
+- **Root Cause**: The Kubernetes and Helm providers used a token from `data "aws_eks_cluster_auth"`, which is fetched once when the plan is made. EKS tokens expire after 15 minutes, and creating the cluster plus the EBS add-on took about 18, so the token was stale by the time Terraform reached the in-cluster resources.
+
+- **Solution**: Switched both providers in `main.tf` to `exec` authentication (`aws eks get-token`), which fetches a fresh token on every connection. A second apply created the remaining 4 resources.
+
 ---
 
 ## Database Issue
