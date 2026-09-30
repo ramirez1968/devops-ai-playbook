@@ -62,6 +62,12 @@
 
 - **Solution**: Added a ServiceMonitor with the correct path (`/metrics`) and updated the service file of the gateway so that the Grafana dashboard can have the data of the application with source as Prometheus.
 
+### 2. Only the Gateway Was Scraped
+
+- **Problem**: On EKS, Prometheus had 1 boutique target (gateway). Auth, product-service, order-service, orders, and user-service metrics were missing.
+- **Root Cause**: The ServiceMonitor selected only `app: gateway` on a port named `http`. Only the gateway Service had that label and port name; the other five had no labels and unnamed ports.
+- **Solution**: Added `app: <name>` and a port named `http` to the five backend Services, and changed the ServiceMonitor to select all six backend services by `app`.
+
 ---
 
 ## Local Testing (Fixed)
@@ -140,6 +146,12 @@ Found in local testing (2026-09-29). Not fixed yet. Many of the high-severity it
 - **Problem**: Clicking **Checkout** returns to the Home page. The Orders page shows an error.
 - **Root Cause**: `Cart.tsx` navigates to `/checkout`, but no such page or route exists, so the router's catch-all redirects home. `orderService.createOrder()` is never called. The Orders page calls `my-orders` without a user, so orders falls back to the invalid `demo-user-id`.
 - **Proposed Fix**: Build a Checkout page after the identity fix (#2, #5, #6), since it depends on how the user is identified.
+
+#### 7b. Database Passwords in Plain Text in a Public Repo
+
+- **Problem**: `gitops/secrets.yml` holds the Postgres password and all four database URLs in plain text (`stringData`), and the repository is public.
+- **Root Cause**: The Secret is committed to Git so ArgoCD can apply it, with no encryption.
+- **Proposed Fix**: Keep Secrets out of plain Git: Sealed Secrets (encrypted in Git, decrypted in the cluster) or External Secrets Operator with AWS Secrets Manager. Rotate the current passwords afterward.
 
 ### Medium Severity
 

@@ -9,9 +9,19 @@ spec:
   namespaceSelector:
     matchNames:
       - boutique
+  # Every backend service exposes /metrics on its "http" port.
+  # (The frontend is static files and has no /metrics.)
   selector:
-    matchLabels:
-      app: gateway   
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - gateway
+          - auth
+          - product-service
+          - order-service
+          - orders
+          - user-service
   endpoints:
     - port: http
       path: /metrics

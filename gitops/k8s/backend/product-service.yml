@@ -52,11 +52,14 @@ kind: Service
 metadata:
   name: product-service
   namespace: boutique
+  labels:
+    app: product-service
 spec:
   selector:
     app: product-service
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 3003
       targetPort: 3003
   type: ClusterIP
