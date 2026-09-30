@@ -8,6 +8,12 @@ data "aws_caller_identity" "current" {}
 
 resource "aws_iam_user" "github_ci" {
   name = "github-ci"
+
+  # The console stores access key descriptions as user tags
+  # (<access key id> = <description>), so leave tags to the console.
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "aws_iam_user_policy" "github_ci_ecr_push" {
