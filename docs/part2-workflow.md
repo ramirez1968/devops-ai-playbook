@@ -224,10 +224,10 @@ flowchart LR
 - Grafana is pre-loaded with a boutique dashboard via a ConfigMap labelled `grafana_dashboard: "1"` — the Grafana sidecar auto-imports it
 
 **Logs — Fluent Bit + CloudWatch**
-- Fluent Bit is **not** provisioned by Terraform or ArgoCD — install it once by hand with the `aws-for-fluent-bit` Helm chart (see `projects/README.md`)
+- Provisioned by Terraform (`projects/Infrastructure/logging.tf`): the log group, an IRSA role that can only write to it, and the `aws-for-fluent-bit` Helm chart
 - Fluent Bit runs as a DaemonSet in `amazon-cloudwatch`
-- Captures stdout from every pod and ships logs to CloudWatch
-- Log group: `/eks/boutique/pods`
+- Captures stdout from every pod in the `boutique` namespace and ships it to CloudWatch
+- Log group: `/eks/boutique/pods` (7-day retention)
 
 **What to check in Grafana:**
 - Request rate by service
@@ -330,4 +330,5 @@ flowchart TD
 | `gitops/k8s/` | Stage 5 | All Kubernetes manifests |
 | `gitops/k8s/backend/service-monitor.yml` | Stage 6 | Prometheus scrape config |
 | `gitops/k8s/grafana-dashboard.yml` | Stage 6 | Pre-loaded Grafana dashboard |
+| `projects/Infrastructure/logging.tf` | Stage 6 | Fluent Bit → CloudWatch (log group, IRSA role, Helm chart) |
 | `projects/aiops-assistant/` | Stage 7 | Kira — AIOps Bedrock Agent |

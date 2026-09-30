@@ -197,6 +197,7 @@ Found in local testing (2026-09-29). Not fixed yet. Many of the high-severity it
 - Unused `server.js` / `server-fixed.js` in product-service and user-service (these contain routes that don't exist in the running services).
 - The gateway's fallback URLs are mismatched (orders → `:3004`, users → `:3005`).
 - `projects/boutique-microservices/.gitignore` ignores `.dockerignore` files.
+- Grafana (EKS) still uses the kube-prometheus-stack default admin password (`prom-operator`). It's only reachable via port-forward, but should be set from a Secret.
 
 ---
 

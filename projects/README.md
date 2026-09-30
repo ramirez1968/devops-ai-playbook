@@ -527,6 +527,8 @@ The dashboard has a **Service** dropdown variable at the top — use it to filte
 
 ### Log Forwarding to CloudWatch (Optional)
 
+> **Already done by Terraform:** `projects/Infrastructure/logging.tf` creates the log group, an IRSA role, and the Fluent Bit release on `terraform apply`. The manual Helm install below is only for clusters built without it. Note that it uses the older `cloudWatch` plugin; the current chart defaults to `cloudWatchLogs`.
+
 Install Fluent Bit to forward pod logs to CloudWatch:
 
 ```bash
